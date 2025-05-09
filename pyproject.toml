@@ -1,7 +1,7 @@
 [project]
 name = "strict-no-cover"
-version = "0.1.0"
-description = "Error on unnecessary `pragma: no cover`s comments"
+version = "0.1.1"
+description = "Error on unnecessary `pragma: no cover` comments"
 readme = "README.md"
 authors = [{ name = "Samuel Colvin", email = "samuel@pydantic.dev" }]
 license = "MIT"
