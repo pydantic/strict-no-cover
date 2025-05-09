@@ -1,0 +1,62 @@
+[project]
+name = "strict-no-cover"
+version = "0.1.0"
+description = "Error on unnecessary `pragma: no cover`s comments"
+readme = "README.md"
+authors = [{ name = "Samuel Colvin", email = "samuel@pydantic.dev" }]
+license = "MIT"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Topic :: Internet",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.9"
+dependencies = ["pydantic>=2.6"]
+
+[project.urls]
+Homepage = "https://github.com/samuelcolvin/strict-no-cover"
+Source = "https://github.com/samuelcolvin/strict-no-cover"
+
+[project.scripts]
+strict-no-cover = "strict_no_cover.__main__:cli"
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+include = ["strict_no_cover/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["Q", "RUF100", "C90", "UP", "I"]
+flake8-quotes = { inline-quotes = "single", multiline-quotes = "double" }
+isort = { combine-as-imports = true }
+mccabe = { max-complexity = 15 }
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+# don't format python in docstrings, pytest-examples takes care of it
+docstring-code-format = false
+quote-style = "single"
+
+[tool.pyright]
+pythonVersion = "3.9"
+typeCheckingMode = "strict"
+reportUnnecessaryTypeIgnoreComment = true
+include = ["strict_no_cover"]
+venvPath = ".venv"
+
+[dependency-groups]
+dev = ["pyright>=1.1.400", "ruff>=0.11.8"]
