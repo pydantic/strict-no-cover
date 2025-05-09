@@ -7,7 +7,7 @@ import sys
 from importlib.metadata import version as _metadata_version
 from tempfile import NamedTemporaryFile
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 def strict_no_cover() -> int:
@@ -38,13 +38,10 @@ def strict_no_cover() -> int:
         if not common_lines:
             continue
 
-        code_analysise: CodeAnalyzer | None = None
+        code_analysise = CodeAnalyzer(file_name)
 
         def add_block(start: int, end: int):
             nonlocal code_analysise, total_lines
-
-            if code_analysise is None:
-                code_analysise = CodeAnalyzer(file_name)
 
             if not code_analysise.all_block_openings(start, end):
                 b = str(start) if start == end else f'{start} to {end}'
@@ -74,26 +71,9 @@ def strict_no_cover() -> int:
         return 0
 
 
-class FunctionSummary(BaseModel):
-    covered_lines: int
-    num_statements: int
-    percent_covered: float
-    percent_covered_display: str
-    missing_lines: int
-    excluded_lines: int
-    num_branches: int
-    num_partial_branches: int
-    covered_branches: int
-    missing_branches: int
-
-
 class FileCoverage(BaseModel):
     executed_lines: list[int]
-    summary: FunctionSummary
-    missing_lines: list[int]
     excluded_lines: list[int]
-    executed_branches: list[list[int]] = Field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
-    missing_branches: list[list[int]] = Field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
 
 
 class CoverageReport(BaseModel):
