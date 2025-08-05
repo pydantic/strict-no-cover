@@ -14,12 +14,14 @@ def strict_no_cover() -> int:
     print(f'strict-no-cover v{_metadata_version("strict-no-cover")}')
 
     exclude_comment = os.getenv('EXCLUDE_COMMENT', 'pragma: no cover')
+    coverage_file = os.getenv('COVERAGE_FILE', '.coverage')
+
     with NamedTemporaryFile(suffix='.json') as coverage_json:
         with NamedTemporaryFile(mode='w', suffix='.toml') as config_file:
             config_file.write(f"[tool.coverage.report]\nexclude_lines = ['{exclude_comment}']\n")
             config_file.flush()
             p = subprocess.run(
-                ['uv', 'run', 'coverage', 'json', f'--rcfile={config_file.name}', '-o', coverage_json.name],
+                ['uv', 'run', 'coverage', 'json', f'--rcfile={config_file.name}', '-o', coverage_json.name, "--data-file", coverage_file],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
             )
