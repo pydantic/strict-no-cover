@@ -29,27 +29,48 @@ def strict_no_cover() -> int:
                 print(f'❎ Error running `coverage json`:\n{p.stdout.decode().rstrip()}', file=sys.stderr)
                 return p.returncode
 
-        r = CoverageReport.model_validate_json(coverage_json.read())
+        report = CoverageReport.model_validate_json(coverage_json.read())
 
+    blocks, total_lines = collect_violation_blocks(report)
+
+    if blocks:
+        print(f"❎ {total_lines} lines wrongly marked with '{exclude_comment}' are covered")
+        print('\n'.join(blocks))
+        return 1
+    else:
+        print(f"✅ No lines wrongly marked with '{exclude_comment}'")
+        return 0
+
+
+def collect_violation_blocks(report: CoverageReport) -> tuple[list[str], int]:
+    """Return (formatted block lines, total covered-line count) for violations.
+
+    Pure function over an already-parsed `CoverageReport`. Extracted from
+    `strict_no_cover()` so the block-merging + dedup logic is unit-testable
+    without going through the `coverage json` subprocess.
+    """
     blocks: list[str] = []
     total_lines = 0
-    for file_name, file_coverage in r.files.items():
+    for file_name, file_coverage in report.files.items():
         # Find lines that are both excluded and executed
         common_lines = sorted(set(file_coverage.excluded_lines) & set(file_coverage.executed_lines))
 
         if not common_lines:
             continue
 
-        code_analysise = CodeAnalyzer(file_name)
+        code_analyzer = CodeAnalyzer(file_name)
 
-        def add_block(start: int, end: int):
-            nonlocal code_analysise, total_lines
+        def add_block(start: int, end: int) -> None:
+            nonlocal total_lines
 
-            if not code_analysise.all_block_openings(start, end):
+            if not code_analyzer.all_block_openings(start, end):
                 b = str(start) if start == end else f'{start} to {end}'
-                if not blocks or blocks[-1] != b:
+                # Dedup consecutive identical entries — compare full formatted strings
+                # so the check is type-correct (the bug in v0.1.1 compared 'file:b' against 'b').
+                entry = f'  {file_name}:{b}'
+                if not blocks or blocks[-1] != entry:
                     total_lines += end - start + 1
-                    blocks.append(f'  {file_name}:{b}')
+                    blocks.append(entry)
 
         first_line, *rest = common_lines
         current_start = current_end = first_line
@@ -64,13 +85,7 @@ def strict_no_cover() -> int:
 
         add_block(current_start, current_end)
 
-    if blocks:
-        print(f"❎ {total_lines} lines wrongly marked with '{exclude_comment}' are covered")
-        print('\n'.join(blocks))
-        return 1
-    else:
-        print(f"✅ No lines wrongly marked with '{exclude_comment}'")
-        return 0
+    return blocks, total_lines
 
 
 class FileCoverage(BaseModel):
