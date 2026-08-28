@@ -29,13 +29,16 @@ def strict_no_cover() -> int:
     for abs_file_name in sorted(data.measured_files()):
         file_name = os.path.relpath(abs_file_name)
         try:
-            excluded = cov._analyze(abs_file_name).excluded
+            file_reporter = cov._get_file_reporter(abs_file_name)
+            excluded = file_reporter.excluded_lines()
+            executed = file_reporter.translate_lines(data.lines(abs_file_name) or ())
         except CoverageException:
             continue
 
-        # Find lines that are both excluded and executed, using raw traced lines since
-        # coverage's Analysis.executed strips excluded lines in recent versions
-        common_lines = sorted(excluded & set(data.lines(abs_file_name) or ()))
+        # Find lines that are both excluded and executed. Traced lines are translated so
+        # continuation lines of multi-line statements collapse to the statement's first line,
+        # letting the block-opening exemption below handle multi-line `def` signatures.
+        common_lines = sorted(excluded & executed)
 
         if not common_lines:
             continue
