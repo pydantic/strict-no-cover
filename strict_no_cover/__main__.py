@@ -2,54 +2,59 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import sys
-from importlib.metadata import version as _metadata_version
-from tempfile import NamedTemporaryFile
+from importlib.metadata import PackageNotFoundError, version as _metadata_version
 
-from pydantic import BaseModel
+from coverage import Coverage
+from coverage.exceptions import CoverageException
 
 
 def strict_no_cover() -> int:
-    print(f'strict-no-cover v{_metadata_version("strict-no-cover")}')
+    try:
+        print(f'strict-no-cover v{_metadata_version("strict-no-cover")}')
+    except PackageNotFoundError:
+        print('strict-no-cover (uninstalled)')
 
     exclude_comment = os.getenv('EXCLUDE_COMMENT', 'pragma: no cover')
     coverage_file = os.getenv('COVERAGE_FILE', '.coverage')
 
-    with NamedTemporaryFile(suffix='.json') as coverage_json:
-        with NamedTemporaryFile(mode='w', suffix='.toml') as config_file:
-            config_file.write(f"[tool.coverage.report]\nexclude_lines = ['{exclude_comment}']\n")
-            config_file.flush()
-            p = subprocess.run(
-                ['uv', 'run', 'coverage', 'json', f'--rcfile={config_file.name}', '-o', coverage_json.name, "--data-file", coverage_file],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-            )
-            if p.returncode != 0:
-                print(f'❎ Error running `coverage json`:\n{p.stdout.decode().rstrip()}', file=sys.stderr)
-                return p.returncode
-
-        r = CoverageReport.model_validate_json(coverage_json.read())
+    cov = Coverage(data_file=coverage_file)
+    cov.config.exclude_list = [exclude_comment]
+    try:
+        cov.load()
+        data = cov.get_data()
+    except CoverageException as e:
+        print(f'❎ Error loading coverage data: {e}', file=sys.stderr)
+        return 1
 
     blocks: list[str] = []
     total_lines = 0
-    for file_name, file_coverage in r.files.items():
-        # Find lines that are both excluded and executed
-        common_lines = sorted(set(file_coverage.excluded_lines) & set(file_coverage.executed_lines))
+    for abs_file_name in sorted(data.measured_files()):
+        file_name = os.path.relpath(abs_file_name)
+        try:
+            file_reporter = cov._get_file_reporter(abs_file_name)
+            excluded = file_reporter.excluded_lines()
+            executed = file_reporter.translate_lines(data.lines(abs_file_name) or ())
+        except CoverageException:
+            continue
+
+        # Find lines that are both excluded and executed. Traced lines are translated so
+        # continuation lines of multi-line statements collapse to the statement's first line,
+        # letting the block-opening exemption below handle multi-line `def` signatures.
+        common_lines = sorted(excluded & executed)
 
         if not common_lines:
             continue
 
-        code_analysise = CodeAnalyzer(file_name)
+        code_analyzer = CodeAnalyzer(file_name)
 
         def add_block(start: int, end: int):
-            nonlocal code_analysise, total_lines
+            nonlocal code_analyzer, total_lines
 
-            if not code_analysise.all_block_openings(start, end):
+            if not code_analyzer.all_block_openings(start, end):
                 b = str(start) if start == end else f'{start} to {end}'
-                if not blocks or blocks[-1] != b:
-                    total_lines += end - start + 1
-                    blocks.append(f'  {file_name}:{b}')
+                total_lines += end - start + 1
+                blocks.append(f'  {file_name}:{b}')
 
         first_line, *rest = common_lines
         current_start = current_end = first_line
@@ -73,15 +78,6 @@ def strict_no_cover() -> int:
         return 0
 
 
-class FileCoverage(BaseModel):
-    executed_lines: list[int]
-    excluded_lines: list[int]
-
-
-class CoverageReport(BaseModel):
-    files: dict[str, FileCoverage]
-
-
 # python expressions that can open blocks so can have the `# pragma: no cover` comment on them
 # even though they're covered
 BLOCK_OPENINGS = re.compile(rb'\s*(?:def|async def|@|class|if|elif|else)')
@@ -90,14 +86,13 @@ BLOCK_OPENINGS = re.compile(rb'\s*(?:def|async def|@|class|if|elif|else)')
 class CodeAnalyzer:
     def __init__(self, file_path: str) -> None:
         with open(file_path, 'rb') as f:
-            content = f.read()
-        self.lines: dict[int, bytes] = dict(enumerate(content.splitlines(), start=1))
+            self.lines: list[bytes] = f.read().splitlines()
 
     def all_block_openings(self, start: int, end: int) -> bool:
         return all(self._is_block_opening(line_no) for line_no in range(start, end + 1))
 
     def _is_block_opening(self, line_no: int) -> bool:
-        return bool(BLOCK_OPENINGS.match(self.lines[line_no]))
+        return bool(BLOCK_OPENINGS.match(self.lines[line_no - 1]))
 
 
 def cli():
