@@ -7,7 +7,7 @@ import sys
 from importlib.metadata import version as _metadata_version
 from tempfile import NamedTemporaryFile
 
-from pydantic import BaseModel
+from pydantic_core import from_json
 
 
 def strict_no_cover() -> int:
@@ -29,13 +29,13 @@ def strict_no_cover() -> int:
                 print(f'❎ Error running `coverage json`:\n{p.stdout.decode().rstrip()}', file=sys.stderr)
                 return p.returncode
 
-        r = CoverageReport.model_validate_json(coverage_json.read())
+        report = from_json(coverage_json.read())
 
     blocks: list[str] = []
     total_lines = 0
-    for file_name, file_coverage in r.files.items():
+    for file_name, file_coverage in report['files'].items():
         # Find lines that are both excluded and executed
-        common_lines = sorted(set(file_coverage.excluded_lines) & set(file_coverage.executed_lines))
+        common_lines = sorted(set(file_coverage['excluded_lines']) & set(file_coverage['executed_lines']))
 
         if not common_lines:
             continue
@@ -71,15 +71,6 @@ def strict_no_cover() -> int:
     else:
         print(f"✅ No lines wrongly marked with '{exclude_comment}'")
         return 0
-
-
-class FileCoverage(BaseModel):
-    executed_lines: list[int]
-    excluded_lines: list[int]
-
-
-class CoverageReport(BaseModel):
-    files: dict[str, FileCoverage]
 
 
 # python expressions that can open blocks so can have the `# pragma: no cover` comment on them
