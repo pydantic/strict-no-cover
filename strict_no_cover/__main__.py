@@ -40,16 +40,15 @@ def strict_no_cover() -> int:
         if not common_lines:
             continue
 
-        code_analysise = CodeAnalyzer(file_name)
+        code_analyzer = CodeAnalyzer(file_name)
 
         def add_block(start: int, end: int):
-            nonlocal code_analysise, total_lines
+            nonlocal code_analyzer, total_lines
 
-            if not code_analysise.all_block_openings(start, end):
+            if not code_analyzer.all_block_openings(start, end):
                 b = str(start) if start == end else f'{start} to {end}'
-                if not blocks or blocks[-1] != b:
-                    total_lines += end - start + 1
-                    blocks.append(f'  {file_name}:{b}')
+                total_lines += end - start + 1
+                blocks.append(f'  {file_name}:{b}')
 
         first_line, *rest = common_lines
         current_start = current_end = first_line
@@ -81,14 +80,13 @@ BLOCK_OPENINGS = re.compile(rb'\s*(?:def|async def|@|class|if|elif|else)')
 class CodeAnalyzer:
     def __init__(self, file_path: str) -> None:
         with open(file_path, 'rb') as f:
-            content = f.read()
-        self.lines: dict[int, bytes] = dict(enumerate(content.splitlines(), start=1))
+            self.lines: list[bytes] = f.read().splitlines()
 
     def all_block_openings(self, start: int, end: int) -> bool:
         return all(self._is_block_opening(line_no) for line_no in range(start, end + 1))
 
     def _is_block_opening(self, line_no: int) -> bool:
-        return bool(BLOCK_OPENINGS.match(self.lines[line_no]))
+        return bool(BLOCK_OPENINGS.match(self.lines[line_no - 1]))
 
 
 def cli():
