@@ -3,14 +3,17 @@ from __future__ import annotations
 import os
 import re
 import sys
-from importlib.metadata import version as _metadata_version
+from importlib.metadata import PackageNotFoundError, version as _metadata_version
 
 from coverage import Coverage
 from coverage.exceptions import CoverageException
 
 
 def strict_no_cover() -> int:
-    print(f'strict-no-cover v{_metadata_version("strict-no-cover")}')
+    try:
+        print(f'strict-no-cover v{_metadata_version("strict-no-cover")}')
+    except PackageNotFoundError:
+        print('strict-no-cover (uninstalled)')
 
     exclude_comment = os.getenv('EXCLUDE_COMMENT', 'pragma: no cover')
     coverage_file = os.getenv('COVERAGE_FILE', '.coverage')
