@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import sys
 from importlib.metadata import version as _metadata_version
-from tempfile import NamedTemporaryFile
 
-from pydantic_core import from_json
+from coverage import Coverage
+from coverage.exceptions import CoverageException
 
 
 def strict_no_cover() -> int:
@@ -16,26 +15,27 @@ def strict_no_cover() -> int:
     exclude_comment = os.getenv('EXCLUDE_COMMENT', 'pragma: no cover')
     coverage_file = os.getenv('COVERAGE_FILE', '.coverage')
 
-    with NamedTemporaryFile(suffix='.json') as coverage_json:
-        with NamedTemporaryFile(mode='w', suffix='.toml') as config_file:
-            config_file.write(f"[tool.coverage.report]\nexclude_lines = ['{exclude_comment}']\n")
-            config_file.flush()
-            p = subprocess.run(
-                ['uv', 'run', 'coverage', 'json', f'--rcfile={config_file.name}', '-o', coverage_json.name, "--data-file", coverage_file],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-            )
-            if p.returncode != 0:
-                print(f'❎ Error running `coverage json`:\n{p.stdout.decode().rstrip()}', file=sys.stderr)
-                return p.returncode
-
-        report = from_json(coverage_json.read())
+    cov = Coverage(data_file=coverage_file)
+    cov.config.exclude_list = [exclude_comment]
+    try:
+        cov.load()
+        data = cov.get_data()
+    except CoverageException as e:
+        print(f'❎ Error loading coverage data: {e}', file=sys.stderr)
+        return 1
 
     blocks: list[str] = []
     total_lines = 0
-    for file_name, file_coverage in report['files'].items():
-        # Find lines that are both excluded and executed
-        common_lines = sorted(set(file_coverage['excluded_lines']) & set(file_coverage['executed_lines']))
+    for abs_file_name in sorted(data.measured_files()):
+        file_name = os.path.relpath(abs_file_name)
+        try:
+            excluded = cov._analyze(abs_file_name).excluded
+        except CoverageException:
+            continue
+
+        # Find lines that are both excluded and executed, using raw traced lines since
+        # coverage's Analysis.executed strips excluded lines in recent versions
+        common_lines = sorted(excluded & set(data.lines(abs_file_name) or ()))
 
         if not common_lines:
             continue
