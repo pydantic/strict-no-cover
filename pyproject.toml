@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 requires-python = ">=3.9"
-dependencies = ["coverage>=7"]
+dependencies = ["coverage>=7,<8"]
 
 [project.urls]
 Homepage = "https://github.com/samuelcolvin/strict-no-cover"

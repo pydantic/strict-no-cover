@@ -314,7 +314,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "coverage", specifier = ">=7" }]
+requires-dist = [{ name = "coverage", specifier = ">=7,<8" }]
 
 [package.metadata.requires-dev]
 dev = [
