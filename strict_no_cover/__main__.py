@@ -27,6 +27,10 @@ def strict_no_cover() -> int:
         print(f'❎ Error loading coverage data: {e}', file=sys.stderr)
         return 1
 
+    if not os.path.exists(data.data_filename()):
+        print(f'❎ No coverage data file found: {data.data_filename()}', file=sys.stderr)
+        return 1
+
     blocks: list[str] = []
     total_lines = 0
     for abs_file_name in sorted(data.measured_files()):
