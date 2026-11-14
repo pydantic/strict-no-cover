@@ -80,7 +80,8 @@ def strict_no_cover() -> int:
 
 # python expressions that can open blocks so can have the `# pragma: no cover` comment on them
 # even though they're covered
-BLOCK_OPENINGS = re.compile(rb'\s*(?:def|async def|@|class|if|elif|else)')
+# A keyword prefix in an identifier is not a block opening, including non-ASCII identifiers.
+BLOCK_OPENINGS = re.compile(rb'\s*(?:(?:def|async def|class|if|elif|else)\b(?![\x80-\xff])|@)')
 
 
 class CodeAnalyzer:
